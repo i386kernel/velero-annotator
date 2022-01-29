@@ -10,13 +10,19 @@ import (
 	"k8s.io/client-go/util/homedir"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 func main() {
+	namespace := flag.String("namespace", "default", "Namespace Name to annotate, pods")
+	flag.Parse()
+	fmt.Println("The namespace defined is ", namespace, *namespace)
+	client := CreateClient()
+	AnnotatePods(*namespace, client)
+}
+
+func CreateClient() *kubernetes.Clientset {
 
 	var kubeconfig *string
-	var namespace = "akme"
 
 	if home := homedir.HomeDir(); home != "" {
 		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional "+
@@ -36,6 +42,10 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
+	return clientset
+}
+
+func AnnotatePods(namespace string, clientset *kubernetes.Clientset) {
 
 	for {
 		pods, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
@@ -49,14 +59,13 @@ func main() {
 					continue
 				}
 				fmt.Printf("Pod: %s --- > VolumeName: %s", item.Name, vols.Name)
-				annotations := map[string]string{"backup.velero.io/backup-volumes":vols.Name}
-				item.SetAnnotations (annotations)
+				annotations := map[string]string{"backup.velero.io/backup-volumes": vols.Name}
+				item.SetAnnotations(annotations)
 				_, err := clientset.CoreV1().Pods(namespace).Update(context.TODO(), &item, metav1.UpdateOptions{})
 				if err != nil {
 					fmt.Println(err)
 				}
 			}
 		}
-		time.Sleep(10 * time.Second)
 	}
 }
